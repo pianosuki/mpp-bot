@@ -1,0 +1,48 @@
+# Multiplayer Piano Bot Python Library
+
+https://multiplayerpiano.com
+
+## Prerequisites
+
+- Python 3.11
+
+## Installation
+
+1. Clone the repository: `git clone https://github.com/pianosuki/mpp-bot.git`
+2. Navigate to the project directory: `cd mpp-bot`
+3. Create a virtual environment: `python3 -m venv venv`
+4. Activate the virtual environment: `source venv/bin/activate`
+5. Install the dependencies: `pip install -r requirements.txt`
+
+## Configuration
+
+1. Request a bot token from here: [MPP Bot Guide](https://docs.google.com/document/d/1OrxwdLD1l1TE8iau6ToETVmnLuLXyGBhA0VfAY1Lf14)
+2. Create the file `.env` and set the following variables:
+   - `TOKEN=<your-mpp-bot-token>`
+   - `NAME=<your-bot-name>`
+   - `COLOR=<#hex-color-code>`
+   - `CHANNEL=<channel-name-to-join>`
+
+## Running the project
+
+1. Run the main script: `python main.py`
+   
+## Customization
+
+1. Define a class that inherits `MPPClient`:
+   - ```python
+     class MyCustomBot(MPPClient):
+         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443):
+             super().__init__(token, name, color, channel, host, port)
+     ```
+2. Add method overwrites to your new class as needed:
+   - ```python
+     ...
+     async def handle_a_message(self, message: MPPMessage):
+         """MESSAGE"""
+         pass
+     ...
+     ```
+2. Edit `main.py`:
+   - Import your custom bot class
+   - Change the line `BOT_CLASS = MPPClient` to be assigned to your custom bot class
