@@ -22,6 +22,16 @@ https://multiplayerpiano.com
    - `NAME=<your-bot-name>`
    - `COLOR=<#hex-color-code>`
    - `CHANNEL=<channel-name-to-join>`
+3. Edit the file `config/schema.json` and change the `"defaults"` object as needed:
+   - ```json
+     {
+         "defaults": {
+             "users": [
+                 {"client_id": "<your-user-id>", "roles": "user,admin", "usernames": "<your-username>"}
+             ]
+         }
+     }
+     ```
 
 ## Running the project
 

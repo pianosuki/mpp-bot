@@ -60,7 +60,7 @@ class MPPMessage:
         self.payload = kwargs
 
     def __str__(self):
-        return f"{self.serialize()}"
+        return f"MPPMessage Object: (type={self.type}, {', '.join(['{}={}'.format(key, value) for key, value in self.payload.items()])})"
 
     def serialize(self) -> dict:
         json_msg = {key: value for key, value in self.payload.items()}

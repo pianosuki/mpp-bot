@@ -1,0 +1,20 @@
+{
+    "tables": [
+        {
+            "name": "users",
+            "columns": [
+                {"column_name": "id", "column_type": "INTEGER", "primary_key": true},
+                {"column_name": "client_id", "column_type": "TEXT", "unique": true, "nullability": false},
+                {"column_name": "roles", "column_type": "TEXT", "nullability": false},
+                {"column_name": "usernames", "column_type": "TEXT"},
+                {"column_name": "added_at", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]},
+                {"column_name": "last_seen", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]}
+            ]
+        }
+    ],
+    "defaults": {
+        "users": [
+            {"client_id": "85e386d89f0181b4bf4f1041", "roles": "user,admin", "usernames": "Johan"}
+        ]
+    }
+}

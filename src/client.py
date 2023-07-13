@@ -1,24 +1,40 @@
-import asyncio, websockets, traceback, json, time
-from typing import List, TypeVar
-from src.message import MPPMessage
+import asyncio, websockets, json, time
+from typing import List, TypeVar, Optional
+from src.crud import DatabaseManager
+from src.lib import MPPMessage, Logger, Participant
+from src.utils import sqliteutils
 
 CLIENT_TICK_HZ = 5
 
 
 class MPPClient:
-    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443):
+    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot"):
         self.token = token
         self.name = name
         self.color = color
         self.channel = channel
         self.host = host
         self.port = port
+        self.instance = instance_name
 
-        self.websocket = None
+        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
+        self.db: Optional[DatabaseManager] = None
         self.inbound_queue = asyncio.Queue()
         self.outbound_queue = asyncio.Queue()
+        self.logger = Logger(self.__class__.__name__)
 
         self.delta_time = 1 / CLIENT_TICK_HZ  # Time since last simulation loop
+
+    def __enter__(self):
+        self.db = DatabaseManager(self.instance)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.logger.log(f"Uncaught exception occurred: {exc_type}, {exc_val}")
+
+        self.db.close()
+
+        return False
 
     async def run(self):
         try:
@@ -27,12 +43,13 @@ class MPPClient:
             push_task = asyncio.create_task(self.push_task())
             connection_task = asyncio.create_task(self.handle_connection())
             server_handler_task = asyncio.create_task(self.handle_message())
-            await asyncio.gather(push_task, pull_task, connection_task, server_handler_task)
-        except Exception as e:
-            print(f"ERROR: {e}")
-            traceback.print_exc()
+            simulation_task = asyncio.create_task(self.simulation_loop())
+            await asyncio.gather(push_task, pull_task, connection_task, server_handler_task, simulation_task)
+        except websockets.ConnectionClosedError as e:
+            self.logger.log(f"WebSocket connection closed: {e.code}, {e.reason}")
         finally:
-            await self.disconnect()
+            if not self.websocket.closed:
+                await self.disconnect()
 
     async def simulation_loop(self):
         while True:
@@ -41,24 +58,24 @@ class MPPClient:
             # Stuff
 
             elapsed_time = asyncio.get_running_loop().time() - start_time
-            await asyncio.sleep(max(0, 1 / CLIENT_TICK_HZ - elapsed_time))
+            await asyncio.sleep(max(0.0, 1 / CLIENT_TICK_HZ - elapsed_time))
             self.delta_time = max(1 / CLIENT_TICK_HZ, elapsed_time)
 
     async def connect(self):
         self.websocket = await websockets.connect(f"wss://{self.host}:{self.port}")
-        print("Authenticating with token...")
+        self.logger.log("Authenticating with token...")
         request = [MPPMessage(MPPMessage.ServerBound.CONNECT, token=self.token)]
         await self.send(request)
-        print(f"Setting up user '{self.name}' and joining channel '{self.channel}'...")
+        self.logger.log(f"Setting user '{self.name}' and joining channel '{self.channel}'...")
         request = [MPPMessage(MPPMessage.ServerBound.USERSET, set={"name": self.name, "color": self.color}), MPPMessage(MPPMessage.ServerBound.SETCHANNEL, _id=self.channel)]
         await self.send(request)
-        print("Connected to MPP!")
+        self.logger.log("Connected to MPP!")
 
     async def disconnect(self):
         request = [MPPMessage(MPPMessage.ServerBound.DISCONNECT)]
         await self.send(request)
         await self.websocket.close()
-        print("Disconnected from MPP!")
+        self.logger.log("Disconnected from MPP!")
 
     async def send(self, messages: List[MPPMessage]):
         await self.websocket.send(json.dumps([message.serialize() for message in messages]))
@@ -73,14 +90,14 @@ class MPPClient:
             messages = await self.recv()
             await self.inbound_queue.put(messages)
             for message in messages:
-                print(f"Received ({message.type}) message: {str(message)}")
+                self.logger.log(f"Received ({message.type}) message: {str(message)}")
 
     async def push_task(self):
         while True:
             messages = await self.outbound_queue.get()
             await self.send(messages)
             for message in messages:
-                print(f"Sent ({message.type}) message: {str(message)}")
+                self.logger.log(f"Sent ({message.type}) message: {str(message)}")
 
     async def handle_connection(self):
         while True:
@@ -117,7 +134,9 @@ class MPPClient:
 
     async def handle_ch_message(self, message: MPPMessage):
         """CHANNELINFO"""
-        pass
+        for participant_info in message.payload.get("ppl"):
+            participant = Participant.deserialize(participant_info)
+            await self.handle_participant(participant)
 
     async def handle_custom_message(self, message: MPPMessage):
         """CUSTOM"""
@@ -159,14 +178,22 @@ class MPPClient:
         """UNKNOWN"""
         pass
 
+    async def handle_participant(self, participant: Participant):
+        if not self.db.user_exists(participant.client_id):
+            role = "bot" if participant.tag is not None and participant.tag.text == "BOT" else "user"
+            now = sqliteutils.datetime_to_string()
+            values = {
+                "client_id": participant.client_id,
+                "roles": role,
+                "usernames": participant.name,
+                "added_at": now,
+                "last_seen": now
+            }
+            self.db.add_user(values)
+
     @staticmethod
     def get_time():
         return round(time.time() * 1000)
 
 
 CustomBotType = TypeVar("CustomBotType", bound=MPPClient)
-
-
-class MyCustomBot(MPPClient):
-    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443):
-        super().__init__(token, name, color, channel, host, port)
