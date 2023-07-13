@@ -22,6 +22,7 @@ https://multiplayerpiano.com
    - `NAME=<your-bot-name>`
    - `COLOR=<#hex-color-code>`
    - `CHANNEL=<channel-name-to-join>`
+   - `INSTANCE=<database-instance-name>`
 3. Edit the file `config/schema.json` and change the `"defaults"` object as needed:
    - ```json
      {
@@ -42,8 +43,8 @@ https://multiplayerpiano.com
 1. Define a class that inherits `MPPClient`:
    - ```python
      class MyCustomBot(MPPClient):
-         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443):
-             super().__init__(token, name, color, channel, host, port)
+         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot"):
+             super().__init__(token, name, color, channel, host, port, instance_name)
      ```
 2. Add method overwrites to your new class as needed:
    - ```python
