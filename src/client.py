@@ -1,14 +1,16 @@
 import asyncio, websockets, json, time
-from typing import List, TypeVar, Optional
+from typing import List, Optional
 from src.crud import DatabaseManager
-from src.lib import MPPMessage, Logger, Participant
+from src.lib import MPPMessage, Logger, Participant, CommandMessage
 from src.utils import sqliteutils
+from src.exceptions import *
+from config import Config
 
-CLIENT_TICK_HZ = 5
+config = Config()
 
 
 class MPPClient:
-    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot"):
+    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
         self.token = token
         self.name = name
         self.color = color
@@ -16,6 +18,7 @@ class MPPClient:
         self.host = host
         self.port = port
         self.instance = instance_name
+        self.prefix = prefix
 
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.db: Optional[DatabaseManager] = None
@@ -23,7 +26,8 @@ class MPPClient:
         self.outbound_queue = asyncio.Queue()
         self.logger = Logger(self.__class__.__name__)
 
-        self.delta_time = 1 / CLIENT_TICK_HZ  # Time since last simulation loop
+        self._client_tick_hz = 5
+        self._delta_time = 1 / self.tps
 
     def __enter__(self):
         self.db = DatabaseManager(self.instance)
@@ -58,8 +62,8 @@ class MPPClient:
             # Stuff
 
             elapsed_time = asyncio.get_running_loop().time() - start_time
-            await asyncio.sleep(max(0.0, 1 / CLIENT_TICK_HZ - elapsed_time))
-            self.delta_time = max(1 / CLIENT_TICK_HZ, elapsed_time)
+            await asyncio.sleep(max(0.0, 1 / self.tps - elapsed_time))
+            self.dt = max(1 / self.tps, elapsed_time)
 
     async def connect(self):
         self.websocket = await websockets.connect(f"wss://{self.host}:{self.port}")
@@ -114,7 +118,14 @@ class MPPClient:
                     
     async def handle_a_message(self, message: MPPMessage):
         """MESSAGE"""
-        pass
+        msg = message.payload["a"].strip()
+        if msg.startswith(self.prefix) and len(msg) > 1:
+            try:
+                command = CommandMessage.deserialize(msg)
+                await self.handle_command(command, message)
+            except (ArgumentValueError, OptionValueError, ArgumentMissingError, OptionMutualExclusivityError) as e:
+                response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=e.error, reply_to=message.payload["id"])]
+                await self.outbound_queue.put(response)
     
     async def handle_dm_message(self, message: MPPMessage):
         """DIRECTMESSAGE"""
@@ -168,7 +179,8 @@ class MPPClient:
 
     async def handle_p_message(self, message: MPPMessage):
         """PARTICIPANTADDED"""
-        pass
+        participant = Participant.deserialize(message.payload)
+        await self.handle_participant(participant)
 
     async def handle_t_message(self, message: MPPMessage):
         """PONG"""
@@ -179,9 +191,9 @@ class MPPClient:
         pass
 
     async def handle_participant(self, participant: Participant):
+        now = sqliteutils.datetime_to_string()
         if not self.db.user_exists(participant.client_id):
             role = "bot" if participant.tag is not None and participant.tag.text == "BOT" else "user"
-            now = sqliteutils.datetime_to_string()
             values = {
                 "client_id": participant.client_id,
                 "roles": role,
@@ -190,10 +202,61 @@ class MPPClient:
                 "last_seen": now
             }
             self.db.add_user(values)
+        else:
+            aliases = self.db.get_user_column(participant.client_id, "usernames")
+            usernames = aliases + ("\0{}".format(participant.name) if participant.name not in aliases.split("\0") else "")
+            values = {
+                "last_seen": now
+            }
+            if usernames != aliases:
+                values["usernames"] = usernames
+            self.db.update_user(participant.client_id, values)
+
+    async def handle_command(self, command: CommandMessage, message: MPPMessage):
+        handler = getattr(self, f"handle_{command.type.name}_command")
+        await handler(command, message)
+
+    async def handle_help_command(self, command: CommandMessage, message: MPPMessage):
+        """HELP"""
+        response = []
+        for member in command.type.get_commands():
+            options = ["[{}{}]".format("-" + opt["character"], " " + opt["name"] if opt["type"] is not bool else "") for opt in member.opts]
+            arguments = ["{}".format("<" + arg["name"] + ">" if arg["required"] else "[" + arg["name"] + "]") for arg in member.args]
+            usage = "{}{} {} {}".format(self.prefix, member.name, " ".join(options), " ".join(arguments)).rstrip()
+            msg = f"`{usage}`: {member.description}"
+            response.append(MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg))
+        await self.outbound_queue.put(response)
+
+    async def handle_echo_command(self, command: CommandMessage, message: MPPMessage):
+        """ECHO"""
+        msg = f"{command.args[-1]}"
+        if command.opts["uppercase"]:
+            msg = msg.upper()
+        elif command.opts["lowercase"]:
+            msg = msg.lower()
+        response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg)]
+        await self.outbound_queue.put(response)
+
+    async def handle_unknown_command(self, command: CommandMessage, message: MPPMessage):
+        """UNKNOWN"""
+        pass
 
     @staticmethod
     def get_time():
         return round(time.time() * 1000)
 
+    @property
+    def tps(self) -> float:
+        return self._client_tick_hz
 
-CustomBotType = TypeVar("CustomBotType", bound=MPPClient)
+    @tps.setter
+    def tps(self, client_tick_hz: float):
+        self._client_tick_hz = client_tick_hz
+
+    @property
+    def dt(self) -> float:
+        return self._delta_time
+
+    @dt.setter
+    def dt(self, delta_time: float):
+        self._delta_time = delta_time

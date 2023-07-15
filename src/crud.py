@@ -1,11 +1,15 @@
-import sqlite3, json, os
-from typing import Optional
+import sqlite3, os
+from typing import Optional, Any
 from src.lib import Logger
 from src.utils import sqliteutils
+from config import Config
+
+config = Config()
 
 
 class DatabaseManager:
     def __init__(self, db_name: str):
+        self.schema = config.schema
         self.logger = Logger(self.__class__.__name__)
 
         db_path = os.path.abspath("instance/" + db_name + ".db")
@@ -13,9 +17,6 @@ class DatabaseManager:
 
         self.connection = sqlite3.connect(db_path)
         self.cursor = self.connection.cursor()
-
-        with open("config/schema.json", "r") as schema:
-            self.schema = json.load(schema)
 
         self.create_all()
 
@@ -73,30 +74,27 @@ class DatabaseManager:
         self.cursor.execute(command, *args)
         return True if self.cursor.fetchone() is not None else False
 
-    def get_user_column(self, client_id: str, column_name: str) -> Optional[tuple]:
+    def get_user_column(self, client_id: str, column_name: str) -> Optional[Any]:
         if self.user_exists(client_id):
             command = f"SELECT {column_name} FROM users WHERE client_id = ?"
             args = [(client_id,)]
             self.cursor.execute(command, *args)
         else:
             raise KeyError(f"User with client_id '{client_id}' does not exist")
-        return self.cursor.fetchone()
+        result = self.cursor.fetchone()
+        return result[0] if result is not None else None
 
     def get_user_latest_username(self, client_id: str) -> str:
         usernames = self.get_user_column(client_id, "usernames")
-        return usernames[0].split(',')[-1]
+        return usernames.split("\0")[-1]
 
     # Update #
-    def update_user(self, user_id, column, value):
-        if self.user_exists(user_id):
-            command = f"UPDATE users SET {column} = ? WHERE id = ?"
-            args = [(value, user_id)]
-            self.cursor.execute(command, *args)
-            self.connection.commit()
-            self.logger.log(f"Updated preference '{column}' to '{value}' for user '{user_id}'")
-        else:
-            self.add_user(user_id)
-            self.update_user(user_id, column, value)
+    def update_user(self, client_id: str, column_values: dict):
+        command = f"UPDATE users SET {', '.join([f'{column} = ?' for column in column_values])} WHERE client_id = ?"
+        args = list(column_values.values()) + [client_id]
+        self.cursor.execute(command, args)
+        self.connection.commit()
+        self.logger.log(f"Updated user '{client_id}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
 
     # Delete #
     def drop_table(self, table_name: str):

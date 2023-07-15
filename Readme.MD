@@ -23,6 +23,7 @@ https://multiplayerpiano.com
    - `COLOR=<#hex-color-code>`
    - `CHANNEL=<channel-name-to-join>`
    - `INSTANCE=<database-instance-name>`
+   - `PREFIX=<command-prefix>`
 3. Edit the file `config/schema.json` and change the `"defaults"` object as needed:
    - ```json
      {
@@ -40,20 +41,43 @@ https://multiplayerpiano.com
    
 ## Customization
 
-1. Define a class that inherits `MPPClient`:
+1. Define a class that inherits `src.client.MPPClient`:
    - ```python
      class MyCustomBot(MPPClient):
-         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot"):
-             super().__init__(token, name, color, channel, host, port, instance_name)
+         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
+             super().__init__(token, name, color, channel, host, port, instance_name, prefix)
      ```
-2. Add method overwrites to your new class as needed:
-   - ```python
+   - Add method overwrites to your new class as needed
+     ```python
      ...
      async def handle_a_message(self, message: MPPMessage):
          """MESSAGE"""
          pass
      ...
      ```
-2. Edit `main.py`:
-   - Import your custom bot class
-   - Change the line `BOT_CLASS = MPPClient` to be assigned to your custom bot class
+2. Define a class that inherits `enum.Enum`:
+   - ```python
+     class MyCustomCommands(Enum):
+         pass
+     ```
+   - Add commands to your new enum as needed
+     ```python
+     ...
+     ECHO = (
+         "Echos a message back to the user",
+         None,
+         [{"name": "message", "type": str, "required": True, "trailing": True}],
+         [
+             {"name": "uppercase", "type": bool, "character": "u", "mutually_exclusive_to": ["lowercase"]},
+             {"name": "lowercase", "type": bool, "character": "l", "mutually_exclusive_to": ["uppercase"]}
+         ]
+     )
+     ...
+     ```
+3. Edit `config/customization.py`:
+   - In the `bot` property:
+     - Import your custom bot class
+     - Change the line `BOT_CLASS = MPPClient` to be assigned to your custom bot class 
+   - In the `commands` property:
+     - Import your custom commands enum class
+     - Change the line `COMMANDS = Commands` to be assigned to your custom commands enum class
