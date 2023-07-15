@@ -41,26 +41,12 @@ https://multiplayerpiano.com
    
 ## Customization
 
-1. Define a class that inherits `src.client.MPPClient`:
-   - ```python
-     class MyCustomBot(MPPClient):
-         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
-             super().__init__(token, name, color, channel, host, port, instance_name, prefix)
-     ```
-   - Add method overwrites to your new class as needed
-     ```python
-     ...
-     async def handle_a_message(self, message: MPPMessage):
-         """MESSAGE"""
-         pass
-     ...
-     ```
-2. Define a class that inherits `enum.Enum`:
+1. **Commands** - Define a class that inherits `enum.Enum`:
    - ```python
      class MyCustomCommands(Enum):
          pass
      ```
-   - Add commands to your new enum as needed
+   - Add commands to your new enum as needed:
      ```python
      ...
      ECHO = (
@@ -74,10 +60,42 @@ https://multiplayerpiano.com
      )
      ...
      ```
-3. Edit `config/customization.py`:
+2. **Bot** - Define a class that inherits `src.client.MPPClient`:
+   - ```python
+     class MyCustomBot(MPPClient):
+         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
+             super().__init__(token, name, color, channel, host, port, instance_name, prefix)
+     ```
+   - Add method overwrites to your new class as needed: `def handle_"lowercase_name"_message` ([MPP message protocol](https://github.com/LapisHusky/mppclone/blob/main/docs/protocol.md))
+     ```python
+     ...
+     async def handle_a_message(self, message: MPPMessage):
+         """MESSAGE"""
+         print(message.payload["a"])
+     ...
+     ```
+   - Add methods for each of your commands: `def handle_"lowercase_name"_command`
+     ```python
+     ...
+     async def handle_echo_command(self, command: CommandMessage, message: MPPMessage):
+         """ECHO"""
+         msg = f"{command.args['message']}"
+         if command.opts["uppercase"]:
+             msg = msg.upper()
+         elif command.opts["lowercase"]:
+             msg = msg.lower()
+         response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg)]
+         await self.outbound_queue.put(response)
+     ...
+     ```
+3. **Config** - Edit `config/customization.py`:
    - In the `bot` property:
      - Import your custom bot class
      - Change the line `BOT_CLASS = MPPClient` to be assigned to your custom bot class 
    - In the `commands` property:
      - Import your custom commands enum class
      - Change the line `COMMANDS = Commands` to be assigned to your custom commands enum class
+
+## Contributions
+
+All contributions are welcome and appreciated!

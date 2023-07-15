@@ -1,6 +1,6 @@
 from typing import Any, Tuple
 
-__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMutualExclusivityError"]
+__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError"]
 
 
 class ArgumentValueError(Exception):
@@ -23,6 +23,13 @@ class ArgumentMissingError(Exception):
     def __init__(self, missing_argument: str):
         self.argument = missing_argument
         self.error = f"**Error:** Missing argument `{self.argument}`"
+        super().__init__(self.error)
+
+
+class OptionMissingError(Exception):
+    def __init__(self, missing_option: str):
+        self.option = missing_option
+        self.error = f"**Error:** Option `{self.option}` is missing a value"
         super().__init__(self.error)
 
 

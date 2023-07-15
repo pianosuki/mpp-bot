@@ -229,7 +229,7 @@ class MPPClient:
 
     async def handle_echo_command(self, command: CommandMessage, message: MPPMessage):
         """ECHO"""
-        msg = f"{command.args[-1]}"
+        msg = f"{command.args['message']}"
         if command.opts["uppercase"]:
             msg = msg.upper()
         elif command.opts["lowercase"]:

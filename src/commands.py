@@ -87,6 +87,12 @@ class Command:
             argument_type = self.args[argument_index]["type"]
         return argument_type
 
+    def get_arg_name(self, argument_index: int) -> Optional[str]:
+        argument_name = None
+        if argument_index < len(self.args):
+            argument_name = self.args[argument_index]["name"]
+        return argument_name
+
     def get_opt_type(self, character: str) -> Optional[Any]:
         option_type = None
         for opt in self.opts:
