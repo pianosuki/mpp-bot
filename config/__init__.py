@@ -1,3 +1,3 @@
-from .customization import Config, BotType, CommandsType
+from .customization import Config, BotType, CommandsType, RolesType
 
-__all__ = ["Config", "BotType", "CommandsType"]
+__all__ = ["Config", "BotType", "CommandsType", "RolesType"]

@@ -1,6 +1,6 @@
-from typing import Any, Tuple
+from typing import Any, Tuple, List, Optional
 
-__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError"]
+__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError", "CommandAuthorizationError"]
 
 
 class ArgumentValueError(Exception):
@@ -38,4 +38,13 @@ class OptionMutualExclusivityError(Exception):
         self.option = option
         self.conflict = conflicting_option
         self.error = f"**Error:** Option `{self.option}` cannot be used simultaneously with option `{self.conflict}`"
+        super().__init__(self.error)
+
+
+class CommandAuthorizationError(Exception):
+    def __init__(self, command_name: str, command_role_names: Optional[List[str]]):
+        self.command_name = command_name
+        self.command_roles = command_role_names
+        required_roles = ', '.join(['`' + role + '`' for role in self.command_roles]) if self.command_roles is not None else "`None`"
+        self.error = f"**Error:** You are not authorized to use the command `{self.command_name}` which requires the following role(s): {required_roles}"
         super().__init__(self.error)

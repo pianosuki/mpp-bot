@@ -3,6 +3,7 @@ from typing import TypeVar, Type
 
 BotType = TypeVar("BotType", bound="MPPClient")
 CommandsType = TypeVar("CommandsType", bound="Enum")
+RolesType = TypeVar("RolesType", bound="Enum")
 
 
 class Config:
@@ -20,6 +21,12 @@ class Config:
         from src.commands import Commands
         COMMANDS = Commands
         return COMMANDS
+
+    @property
+    def roles(self) -> Type[RolesType]:
+        from src.roles import Roles
+        ROLES = Roles
+        return ROLES
 
     @property
     def schema(self) -> dict:

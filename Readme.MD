@@ -29,7 +29,7 @@ https://multiplayerpiano.com
      {
          "defaults": {
              "users": [
-                 {"client_id": "<your-user-id>", "roles": "user,admin", "usernames": "<your-username>"}
+                 {"client_id": "<your-user-id>", "roles": "user,admin,whitelist,owner", "usernames": "<your-username>"}
              ]
          }
      }
@@ -41,7 +41,18 @@ https://multiplayerpiano.com
    
 ## Customization
 
-1. **Commands** - Define a class that inherits `enum.Enum`:
+1. **Roles** - Define a class that inherits `enum.Enum`:
+   - ```python
+     class MyCustomRoles(Enum):
+         pass
+     ```
+   - Add roles to your new enum as needed:
+     ```python
+     ...
+     USER = "A normal user"
+     ...
+     ```
+2. **Commands** - Define a class that inherits `enum.Enum`:
    - ```python
      class MyCustomCommands(Enum):
          pass
@@ -51,7 +62,7 @@ https://multiplayerpiano.com
      ...
      ECHO = (
          "Echos a message back to the user",
-         None,
+         ["user"],
          [{"name": "message", "type": str, "required": True, "trailing": True}],
          [
              {"name": "uppercase", "type": bool, "character": "u", "mutually_exclusive_to": ["lowercase"]},
@@ -60,11 +71,11 @@ https://multiplayerpiano.com
      )
      ...
      ```
-2. **Bot** - Define a class that inherits `src.client.MPPClient`:
+3. **Bot** - Define a class that inherits `src.client.MPPClient`:
    - ```python
      class MyCustomBot(MPPClient):
-         def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
-             super().__init__(token, name, color, channel, host, port, instance_name, prefix)
+         def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, host: str = "mppclone.com", port: int = 443):
+             super().__init__(token, name, color, channel, instance_name, prefix, host, port)
      ```
    - Add method overwrites to your new class as needed: `def handle_"lowercase_name"_message` ([MPP message protocol](https://github.com/LapisHusky/mppclone/blob/main/docs/protocol.md))
      ```python
@@ -88,13 +99,16 @@ https://multiplayerpiano.com
          await self.outbound_queue.put(response)
      ...
      ```
-3. **Config** - Edit `config/customization.py`:
+4. **Config** - Edit `config/customization.py`:
    - In the `bot` property:
      - Import your custom bot class
      - Change the line `BOT_CLASS = MPPClient` to be assigned to your custom bot class 
    - In the `commands` property:
      - Import your custom commands enum class
      - Change the line `COMMANDS = Commands` to be assigned to your custom commands enum class
+   - In the `roles` property:
+     - Import your custom roles enum class
+     - Change the line `ROLES = Roles` to be assigned to your custom roles enum class
 
 ## Contributions
 

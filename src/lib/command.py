@@ -1,6 +1,6 @@
 from typing import Optional, Any, Tuple, Generator
 from src.commands import Command
-from src.exceptions import *
+from src.lib.exceptions import *
 
 
 class CommandMessage:

@@ -14,7 +14,7 @@
     ],
     "defaults": {
         "users": [
-            {"client_id": "85e386d89f0181b4bf4f1041", "roles": "user,admin", "usernames": "Johan"}
+            {"client_id": "85e386d89f0181b4bf4f1041", "roles": "user,admin,whitelist,owner", "usernames": "Johan"}
         ]
     }
 }

@@ -1,5 +1,6 @@
 import sqlite3, os
-from typing import Optional, Any
+from typing import Optional, Any, List
+from src.roles import Role
 from src.lib import Logger
 from src.utils import sqliteutils
 from config import Config
@@ -87,6 +88,10 @@ class DatabaseManager:
     def get_user_latest_username(self, client_id: str) -> str:
         usernames = self.get_user_column(client_id, "usernames")
         return usernames.split("\0")[-1]
+
+    def get_user_roles(self, client_id: str) -> Optional[List[Role]]:
+        result = self.get_user_column(client_id, "roles")
+        return [Role.from_name(role) for role in result.split(",")] if result is not None else None
 
     # Update #
     def update_user(self, client_id: str, column_values: dict):

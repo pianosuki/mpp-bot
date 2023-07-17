@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List, Dict, Any, Optional
+from src.roles import Role
 from config import Config, CommandsType
 
 config = Config()
@@ -15,9 +16,9 @@ class Commands(Enum):
 
       - "Command description"
 
-    - Role required for the command:
+    - Role(s) required for the command:
 
-      - "role_name" (None for no role requirement)
+      - ["List", "of", "roles"] (None for no role requirement)
 
     - List of dictionaries for each argument:
 
@@ -36,7 +37,7 @@ class Commands(Enum):
     Example:
         ECHO = (
             "Echos a message back to the user",\n
-            "user"\n
+            ["user"]\n
             [{"name": "message", "type": str, "required": True, "trailing": True}],\n
             [{"name": "uppercase", "type": bool, "character": "u", "mutually_exclusive_to": ["lowercase"]},\n
             {"name": "lowercase", "type": bool, "character": "l", "mutually_exclusive_to": ["uppercase"]}]\n
@@ -56,7 +57,7 @@ class Commands(Enum):
 
     ECHO = (
         "Echos a message back to the user",
-        None,
+        ["user"],
         [{"name": "message", "type": str, "required": True, "trailing": True}],
         [
             {"name": "uppercase", "type": bool, "character": "u", "mutually_exclusive_to": ["lowercase"]},
@@ -71,12 +72,13 @@ class Command:
 
     __members__ = {**{name: member.value for name, member in commands.__members__.items()}, **{"UNKNOWN": ("Failsafe pseudo-member", None, [], [])}}
 
-    def __init__(self, name: str, description: str, role: Optional[str], args: List[Dict[str, Any]], opts: List[Dict[str, Any]]):
-        self._name = name
+    def __init__(self, name: str, description: str, roles: Optional[List[str]], args: List[Dict[str, Any]], opts: List[Dict[str, Any]]):
         self.description = description
-        self.role = role
         self.args = args
         self.opts = opts
+
+        self._name = name
+        self._roles = roles
 
     def __str__(self):
         return f"{self._name}"
@@ -128,6 +130,10 @@ class Command:
     @property
     def name(self) -> str:
         return self._name.lower()
+
+    @property
+    def roles(self) -> Optional[List[Role]]:
+        return [Role.from_name(role) for role in self._roles] if self._roles is not None else None
 
     @property
     def opt_chars(self) -> List[str]:

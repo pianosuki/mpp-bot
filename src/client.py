@@ -1,30 +1,32 @@
 import asyncio, websockets, json, time
-from typing import List, Optional
+from typing import List, Optional, Dict
 from src.crud import DatabaseManager
 from src.lib import MPPMessage, Logger, Participant, CommandMessage
 from src.utils import sqliteutils
-from src.exceptions import *
+from src.lib.exceptions import *
 from config import Config
 
 config = Config()
 
 
 class MPPClient:
-    def __init__(self, token: str, name: str, color: str, channel: str, host: str = "mppclone.com", port: int = 443, instance_name: str = "mpp_bot", prefix: str = "!"):
+    def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, host: str = "mppclone.com", port: int = 443):
         self.token = token
         self.name = name
         self.color = color
         self.channel = channel
-        self.host = host
-        self.port = port
         self.instance = instance_name
         self.prefix = prefix
+        self.host = host
+        self.port = port
 
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.db: Optional[DatabaseManager] = None
         self.inbound_queue = asyncio.Queue()
         self.outbound_queue = asyncio.Queue()
         self.logger = Logger(self.__class__.__name__)
+
+        self.participants: Dict[str, Participant] = {}
 
         self._client_tick_hz = 5
         self._delta_time = 1 / self.tps
@@ -111,18 +113,19 @@ class MPPClient:
 
     async def handle_message(self):
         while True:
-            messages = await self.inbound_queue.get()
+            messages: List[MPPMessage] = await self.inbound_queue.get()
             for message in messages:
                 handler = getattr(self, f"handle_{message.type.m}_message")
                 await handler(message)
                     
     async def handle_a_message(self, message: MPPMessage):
         """MESSAGE"""
+        sender = self.participants.get(message.sender)
         msg = message.payload["a"].strip()
         if msg.startswith(self.prefix) and len(msg) > 1:
             try:
                 command = CommandMessage.deserialize(msg)
-                await self.handle_command(command, message)
+                await self.handle_command(command, message, sender)
             except (ArgumentValueError, OptionValueError, ArgumentMissingError, OptionMutualExclusivityError) as e:
                 response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=e.error, reply_to=message.payload["id"])]
                 await self.outbound_queue.put(response)
@@ -147,6 +150,7 @@ class MPPClient:
         """CHANNELINFO"""
         for participant_info in message.payload.get("ppl"):
             participant = Participant.deserialize(participant_info)
+            self.participants[participant.client_id] = participant
             await self.handle_participant(participant)
 
     async def handle_custom_message(self, message: MPPMessage):
@@ -212,11 +216,23 @@ class MPPClient:
                 values["usernames"] = usernames
             self.db.update_user(participant.client_id, values)
 
-    async def handle_command(self, command: CommandMessage, message: MPPMessage):
+    async def handle_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         handler = getattr(self, f"handle_{command.type.name}_command")
-        await handler(command, message)
+        try:
+            await self.handle_command_authorization(command, message, sender)
+            await handler(command, message, sender)
+        except CommandAuthorizationError as e:
+            response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=e.error, reply_to=message.payload["id"])]
+            await self.outbound_queue.put(response)
 
-    async def handle_help_command(self, command: CommandMessage, message: MPPMessage):
+    async def handle_command_authorization(self, command: CommandMessage, message: MPPMessage, sender: Participant):
+        user_roles = self.db.get_user_roles(sender.client_id)
+        command_roles = command.type.roles
+        if not all(role in user_roles for role in command_roles):
+            command_role_names = [role.name for role in command.type.roles]
+            raise CommandAuthorizationError(command.type.name, command_role_names)
+
+    async def handle_help_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         """HELP"""
         response = []
         for member in command.type.get_commands():
@@ -227,7 +243,7 @@ class MPPClient:
             response.append(MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg))
         await self.outbound_queue.put(response)
 
-    async def handle_echo_command(self, command: CommandMessage, message: MPPMessage):
+    async def handle_echo_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         """ECHO"""
         msg = f"{command.args['message']}"
         if command.opts["uppercase"]:
@@ -237,7 +253,7 @@ class MPPClient:
         response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg)]
         await self.outbound_queue.put(response)
 
-    async def handle_unknown_command(self, command: CommandMessage, message: MPPMessage):
+    async def handle_unknown_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         """UNKNOWN"""
         pass
 

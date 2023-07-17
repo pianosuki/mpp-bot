@@ -1,6 +1,6 @@
-import json
+import json, re
 from enum import Enum
-from typing import Union, Any, List
+from typing import Union, Any, List, Optional
 
 
 class MPPMessage:
@@ -67,6 +67,26 @@ class MPPMessage:
         json_msg["m"] = self.type.m
         return json_msg
 
+    def search(self, pattern, obj=None) -> Optional[str]:
+        if obj is None:
+            obj = self.payload
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                result = self.search(pattern, value)
+                if result:
+                    return result
+        elif isinstance(obj, list):
+            for item in obj:
+                result = self.search(pattern, item)
+                if result:
+                    return result
+        else:
+            if isinstance(obj, str):
+                match = re.search(pattern, obj)
+                if match:
+                    return str(match.group())
+        return None
+
     @classmethod
     def deserialize(cls, data: str) -> List["MPPMessage"]:
         messages = []
@@ -85,3 +105,8 @@ class MPPMessage:
                 message_type = MPPMessage.ClientBound.UNKNOWN
             messages.append(cls(message_type, **json_msg))
         return messages
+
+    @property
+    def sender(self) -> Optional[str]:
+        pattern = r"^[0-9a-f]{24}$"
+        return self.search(pattern)
