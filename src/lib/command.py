@@ -16,7 +16,7 @@ class CommandMessage:
         filtered = args.copy()
         for i, arg in enumerate(self.type.args):
             if arg["required"] and len(args) < i + 1:
-                raise ArgumentMissingError(arg["attribute"])
+                raise ArgumentMissingError(arg["name"])
         return filtered
 
     def filter_options(self, opts: dict) -> dict:
