@@ -27,6 +27,8 @@ class MPPClient:
         self.logger = Logger(self.__class__.__name__)
 
         self.participants: Dict[str, Participant] = {}
+        self.is_running = True
+        self.retry_count = 0
 
         self._client_tick_hz = 5
         self._delta_time = 1 / self.tps
@@ -43,18 +45,25 @@ class MPPClient:
         return False
 
     async def run(self):
-        try:
-            await self.connect()
-            pull_task = asyncio.create_task(self.pull_task())
-            push_task = asyncio.create_task(self.push_task())
-            connection_task = asyncio.create_task(self.handle_connection())
-            server_handler_task = asyncio.create_task(self.handle_message())
-            simulation_task = asyncio.create_task(self.simulation_loop())
-            await asyncio.gather(push_task, pull_task, connection_task, server_handler_task, simulation_task)
-        except websockets.ConnectionClosedError as e:
-            self.logger.log(f"WebSocket connection closed: {e.code}, {e.reason}")
-        finally:
-            if not self.websocket.closed:
+        while self.is_running:
+            try:
+                await self.connect()
+                pull_task = asyncio.create_task(self.pull_task())
+                push_task = asyncio.create_task(self.push_task())
+                connection_task = asyncio.create_task(self.handle_connection())
+                server_handler_task = asyncio.create_task(self.handle_message())
+                simulation_task = asyncio.create_task(self.simulation_loop())
+                await asyncio.gather(push_task, pull_task, connection_task, server_handler_task, simulation_task)
+            except websockets.ConnectionClosedError as e:
+                delay = max(self.retry_count ** 2, config.max_retry_delay)
+                self.logger.log(f"WebSocket connection closed: code={e.code}, error={e}")
+                self.logger.log(f"Attempting to reconnect in {delay} seconds... (Attempt {self.retry_count})")
+                await asyncio.sleep(delay)
+                self.retry_count += 1
+            except BotTermination as e:
+                self.logger.log(e.error)
+                self.is_running = False
+            finally:
                 await self.disconnect()
 
     async def simulation_loop(self):
@@ -76,11 +85,13 @@ class MPPClient:
         request = [MPPMessage(MPPMessage.ServerBound.USERSET, set={"name": self.name, "color": self.color}), MPPMessage(MPPMessage.ServerBound.SETCHANNEL, _id=self.channel)]
         await self.send(request)
         self.logger.log("Connected to MPP!")
+        self.retry_count = 0
 
     async def disconnect(self):
-        request = [MPPMessage(MPPMessage.ServerBound.DISCONNECT)]
-        await self.send(request)
-        await self.websocket.close()
+        if not self.websocket.closed:
+            request = [MPPMessage(MPPMessage.ServerBound.DISCONNECT)]
+            await self.send(request)
+            await self.websocket.close()
         self.logger.log("Disconnected from MPP!")
 
     async def send(self, messages: List[MPPMessage]):
@@ -140,7 +151,8 @@ class MPPClient:
 
     async def handle_bye_message(self, message: MPPMessage):
         """DISCONNECT"""
-        pass
+        participant = self.participants[message.sender]
+        await self.handle_participant(participant)
 
     async def handle_c_message(self, message: MPPMessage):
         """CHATHISTORY"""
@@ -184,6 +196,7 @@ class MPPClient:
     async def handle_p_message(self, message: MPPMessage):
         """PARTICIPANTADDED"""
         participant = Participant.deserialize(message.payload)
+        self.participants[participant.client_id] = participant
         await self.handle_participant(participant)
 
     async def handle_t_message(self, message: MPPMessage):
@@ -228,7 +241,9 @@ class MPPClient:
     async def handle_command_authorization(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         user_roles = self.db.get_user_roles(sender.client_id)
         command_roles = command.type.roles
-        if not all(role in user_roles for role in command_roles):
+        if command_roles is None or all(role in user_roles for role in command_roles):
+            return
+        elif command_roles is not None and not all(role in user_roles for role in command_roles):
             command_role_names = [role.name for role in command.type.roles]
             raise CommandAuthorizationError(command.type.name, command_role_names)
 

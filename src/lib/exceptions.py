@@ -1,6 +1,6 @@
 from typing import Any, Tuple, List, Optional
 
-__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError", "CommandAuthorizationError"]
+__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError", "CommandAuthorizationError", "BotTermination"]
 
 
 class ArgumentValueError(Exception):
@@ -47,4 +47,11 @@ class CommandAuthorizationError(Exception):
         self.command_roles = command_role_names
         required_roles = ', '.join(['`' + role + '`' for role in self.command_roles]) if self.command_roles is not None else "`None`"
         self.error = f"**Error:** You are not authorized to use the command `{self.command_name}` which requires the following role(s): {required_roles}"
+        super().__init__(self.error)
+
+
+class BotTermination(Exception):
+    def __init__(self, cause: Exception = None):
+        self.cause = cause
+        self.error = f"Terminating bot. Cause: {cause}"
         super().__init__(self.error)

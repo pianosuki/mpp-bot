@@ -33,3 +33,8 @@ class Config:
         SCHEMA = "config/schema.json"
         with open(SCHEMA, "r") as db_schema:
             return json.load(db_schema)
+
+    @property
+    def max_retry_delay(self) -> int:
+        MAX_DELAY = 120
+        return MAX_DELAY
