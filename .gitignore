@@ -9,3 +9,6 @@
 
 # Database
 instance/*
+
+# Config
+config/schema.json

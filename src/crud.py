@@ -1,7 +1,7 @@
 import sqlite3, os
 from typing import Optional, Any, List
 from src.roles import Role
-from src.lib import Logger
+from src.lib import Logger, Debug
 from src.utils import sqliteutils
 from config import Config
 
@@ -9,9 +9,10 @@ config = Config()
 
 
 class DatabaseManager:
-    def __init__(self, db_name: str):
+    def __init__(self, db_name: str, debug: int):
+        self.debug = debug
         self.schema = config.schema
-        self.logger = Logger(self.__class__.__name__)
+        self.logger = Logger(self.__class__.__name__, self.debug)
 
         db_path = os.path.abspath("instance/" + db_name + ".db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -60,7 +61,7 @@ class DatabaseManager:
 
     def add_user(self, column_values: dict):
         self.add_row("users", column_values)
-        self.logger.log(f"Added user '{column_values['client_id']}': (name={column_values['usernames']}, roles={column_values['roles']})")
+        self.logger.log(Debug.DATABASE, f"Added user '{column_values['client_id']}': (name={column_values['usernames']}, roles={column_values['roles']})")
 
     # Read #
     def table_exists(self, table_name: str) -> bool:
@@ -99,7 +100,7 @@ class DatabaseManager:
         args = list(column_values.values()) + [client_id]
         self.cursor.execute(command, args)
         self.connection.commit()
-        self.logger.log(f"Updated user '{client_id}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
+        self.logger.log(Debug.DATABASE, f"Updated user '{client_id}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
 
     # Delete #
     def drop_table(self, table_name: str):

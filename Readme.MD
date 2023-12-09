@@ -24,6 +24,7 @@ https://multiplayerpiano.com
    - `CHANNEL=<channel-name-to-join>`
    - `INSTANCE=<database-instance-name>`
    - `PREFIX=<command-prefix>`
+   - `DEBUG_LEVEL=<all, none, bitwise-integer-sum>`
 3. Edit the file `config/schema.json` and change the `"defaults"` object as needed:
    - ```json
      {

@@ -1,7 +1,7 @@
 import asyncio, websockets, json, time
 from typing import List, Optional, Dict
 from src.crud import DatabaseManager
-from src.lib import MPPMessage, Logger, Participant, CommandMessage
+from src.lib import MPPMessage, Logger, Participant, CommandMessage, Debug
 from src.utils import sqliteutils
 from src.lib.exceptions import *
 from config import Config
@@ -10,13 +10,14 @@ config = Config()
 
 
 class MPPClient:
-    def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, host: str = "mppclone.com", port: int = 443):
+    def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, debug: str, host: str = "mppclone.com", port: int = 443):
         self.token = token
         self.name = name
         self.color = color
         self.channel = channel
         self.instance = instance_name
         self.prefix = prefix
+        self.debug = Debug.from_string(debug)
         self.host = host
         self.port = port
 
@@ -24,7 +25,7 @@ class MPPClient:
         self.db: Optional[DatabaseManager] = None
         self.inbound_queue = asyncio.Queue()
         self.outbound_queue = asyncio.Queue()
-        self.logger = Logger(self.__class__.__name__)
+        self.logger = Logger(self.__class__.__name__, self.debug)
 
         self.participants: Dict[str, Participant] = {}
         self.is_running = True
@@ -34,11 +35,11 @@ class MPPClient:
         self._delta_time = 1 / self.tps
 
     def __enter__(self):
-        self.db = DatabaseManager(self.instance)
+        self.db = DatabaseManager(self.instance, self.debug)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
-            self.logger.log(f"Uncaught exception occurred: {exc_type}, {exc_val}")
+            self.logger.log(Debug.ERROR, f"Uncaught exception occurred: {exc_type}, {exc_val}")
 
         self.db.close()
 
@@ -56,12 +57,12 @@ class MPPClient:
                 await asyncio.gather(push_task, pull_task, connection_task, server_handler_task, simulation_task)
             except websockets.ConnectionClosedError as e:
                 delay = max(self.retry_count ** 2, config.max_retry_delay)
-                self.logger.log(f"WebSocket connection closed: code={e.code}, error={e}")
-                self.logger.log(f"Attempting to reconnect in {delay} seconds... (Attempt {self.retry_count})")
+                self.logger.log(Debug.CONNECTION, f"WebSocket connection closed: code={e.code}, error={e}")
+                self.logger.log(Debug.CONNECTION, f"Attempting to reconnect in {delay} seconds... (Attempt {self.retry_count})")
                 await asyncio.sleep(delay)
                 self.retry_count += 1
             except BotTermination as e:
-                self.logger.log(e.error)
+                self.logger.log(Debug.ERROR, e.error)
                 self.is_running = False
             finally:
                 await self.disconnect()
@@ -78,13 +79,13 @@ class MPPClient:
 
     async def connect(self):
         self.websocket = await websockets.connect(f"wss://{self.host}:{self.port}")
-        self.logger.log("Authenticating with token...")
+        self.logger.log(Debug.CONNECTION, "Authenticating with token...")
         request = [MPPMessage(MPPMessage.ServerBound.CONNECT, token=self.token)]
         await self.send(request)
-        self.logger.log(f"Setting user '{self.name}' and joining channel '{self.channel}'...")
+        self.logger.log(Debug.CONNECTION, f"Setting user '{self.name}' and joining channel '{self.channel}'...")
         request = [MPPMessage(MPPMessage.ServerBound.USERSET, set={"name": self.name, "color": self.color}), MPPMessage(MPPMessage.ServerBound.SETCHANNEL, _id=self.channel)]
         await self.send(request)
-        self.logger.log("Connected to MPP!")
+        self.logger.log(Debug.CONNECTION, "Connected to MPP!")
         self.retry_count = 0
 
     async def disconnect(self):
@@ -92,7 +93,7 @@ class MPPClient:
             request = [MPPMessage(MPPMessage.ServerBound.DISCONNECT)]
             await self.send(request)
             await self.websocket.close()
-        self.logger.log("Disconnected from MPP!")
+        self.logger.log(Debug.CONNECTION, "Disconnected from MPP!")
 
     async def send(self, messages: List[MPPMessage]):
         await self.websocket.send(json.dumps([message.serialize() for message in messages]))
@@ -107,14 +108,14 @@ class MPPClient:
             messages = await self.recv()
             await self.inbound_queue.put(messages)
             for message in messages:
-                self.logger.log(f"Received ({message.type}) message: {str(message)}")
+                self.logger.log(Debug.INBOUND, f"Received ({message.type}) message: {str(message)}")
 
     async def push_task(self):
         while True:
             messages = await self.outbound_queue.get()
             await self.send(messages)
             for message in messages:
-                self.logger.log(f"Sent ({message.type}) message: {str(message)}")
+                self.logger.log(Debug.OUTBOUND, f"Sent ({message.type}) message: {str(message)}")
 
     async def handle_connection(self):
         while True:
