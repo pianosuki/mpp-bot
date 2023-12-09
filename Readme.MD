@@ -75,8 +75,8 @@ https://multiplayerpiano.com
 3. **Bot** - Define a class that inherits `src.client.MPPClient`:
    - ```python
      class MyCustomBot(MPPClient):
-         def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, host: str = "mppclone.com", port: int = 443):
-             super().__init__(token, name, color, channel, instance_name, prefix, host, port)
+         def __init__(self, token: str, name: str, color: str, channel: str, instance_name: str, prefix: str, debug: str, host: str = "mppclone.com", port: int = 443):
+             super().__init__(token, name, color, channel, instance_name, prefix, debug, host, port)
      ```
    - Add method overwrites to your new class as needed: `def handle_"lowercase_name"_message` ([MPP message protocol](https://github.com/LapisHusky/mppclone/blob/main/docs/protocol.md))
      ```python
