@@ -2,17 +2,16 @@ from src.lib import Tag, Vector2D
 
 
 class Participant:
-    def __init__(self, client_id: str, name: str, color: str, x: float, y: float, afk: bool, tag: dict = None, vanished: bool = None):
+    def __init__(self, client_id: str, name: str, color: str, x: float, y: float, tag: dict = None, vanished: bool = None):
         self.client_id = client_id
         self.name = name
         self.color = color
         self.pos = Vector2D(x, y)
-        self.afk = afk
         self.tag = Tag(**tag) if tag is not None else None
         self.vanished = vanished
 
     def __str__(self):
-        return f"Participant Object: (client_id={self.client_id}, name={self.name}, color={self.color}, pos={self.pos}, afk={self.afk}, tag={self.tag}, vanished={self.vanished})"
+        return f"Participant Object: (client_id={self.client_id}, name={self.name}, color={self.color}, pos={self.pos}, tag={self.tag}, vanished={self.vanished})"
 
     def serialize(self) -> dict:
         participant_info = {
@@ -22,7 +21,6 @@ class Participant:
             "color": self.color,
             "x": self.pos.x,
             "y": self.pos.y,
-            "afk": self.afk
         }
         if self.tag is not None:
             participant_info["tag"] = self.tag.serialize()
@@ -37,6 +35,5 @@ class Participant:
                    color=participant_info["color"],
                    x=float(participant_info["x"]),
                    y=float(participant_info["y"]),
-                   afk=participant_info["afk"],
                    tag=participant_info.get("tag"),
                    vanished=participant_info.get("vanished"))
