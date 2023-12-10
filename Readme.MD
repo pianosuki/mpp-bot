@@ -25,12 +25,16 @@ https://multiplayerpiano.com
    - `INSTANCE=<database-instance-name>`
    - `PREFIX=<command-prefix>`
    - `DEBUG_LEVEL=<all, none, bitwise-integer-sum>`
-3. Edit the file `config/schema.json` and change the `"defaults"` object as needed:
+3. Edit the file `config/defaults.json` and change the `"defaults"` object as needed:
    - ```json
      {
          "defaults": {
              "users": [
-                 {"client_id": "<your-user-id>", "roles": "user,admin,whitelist,owner", "usernames": "<your-username>"}
+                 {
+                    "client_id": "<your-user-id>",
+                    "roles": "user,admin,whitelist,owner",
+                    "usernames": "<your-username>"
+                 }
              ]
          }
      }

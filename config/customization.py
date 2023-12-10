@@ -35,6 +35,12 @@ class Config:
             return json.load(db_schema)
 
     @property
+    def defaults(self) -> dict:
+        DEFAULTS = "config/defaults.json"
+        with open(DEFAULTS, "r") as db_defaults:
+            return json.load(db_defaults)
+
+    @property
     def max_retry_delay(self) -> int:
         MAX_DELAY = 120
         return MAX_DELAY

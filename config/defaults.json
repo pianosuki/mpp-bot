@@ -1,0 +1,11 @@
+{
+    "defaults": {
+        "users": [
+            {
+                "client_id": "<your-user-id>",
+                "roles": "user,admin,whitelist,owner",
+                "usernames": "<your-username>"
+            }
+        ]
+    }
+}

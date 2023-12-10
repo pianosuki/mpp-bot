@@ -18,16 +18,11 @@
                 {"column_name": "filename", "column_type": "TEXT", "unique": true, "nullability": false},
                 {"column_name": "uploader_id", "column_type": "INTEGER"},
                 {"column_name": "added_at", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]},
-                {"column_name": "last_played", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]}
+                {"column_name": "last_played", "column_type": "TEXT"}
             ],
             "foreign_keys": [
                 {"child_key": "uploader_id", "parent_table": "users", "parent_key": "id"}
             ]
         }
-    ],
-    "defaults": {
-        "users": [
-            {"client_id": "<your-user-id>", "roles": "user,admin,whitelist,owner", "usernames": "<your-username>"}
-        ]
-    }
+    ]
 }

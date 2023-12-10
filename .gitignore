@@ -11,4 +11,4 @@
 instance/*
 
 # Config
-config/schema.json
+#/config/defaults.json

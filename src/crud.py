@@ -12,6 +12,7 @@ class DatabaseManager:
     def __init__(self, db_name: str, debug: int):
         self.debug = debug
         self.schema = config.schema
+        self.defaults = config.defaults
         self.logger = Logger(self.__class__.__name__, self.debug)
 
         db_path = os.path.abspath("instance/" + db_name + ".db")
@@ -29,8 +30,8 @@ class DatabaseManager:
                 column_def = sqliteutils.get_column_def(table["columns"])
                 foreign_key_def = sqliteutils.get_foreign_key_def(table["foreign_keys"]) if "foreign_keys" in table else None
                 self.create_table(table_name, column_def, foreign_key_def)
-                if table_name in self.schema["defaults"]:
-                    for row in self.schema["defaults"][table_name]:
+                if table_name in self.defaults["defaults"]:
+                    for row in self.defaults["defaults"][table_name]:
                         for column in table["columns"]:
                             if "default_function" in column:
                                 function = sqliteutils.lookup_default_function(column["default_function"][0], globals())
@@ -65,8 +66,7 @@ class DatabaseManager:
 
     def add_midi(self, column_values: dict):
         self.add_row("midis", column_values)
-        client_id = self.get_user_row_dict(column_values['uploader_id'])["client_id"]
-        self.logger.log(Debug.DATABASE, f"Added midi '{column_values['filename']}': (client_id={client_id})")
+        self.logger.log(Debug.DATABASE, f"Added MIDI '{column_values['filename']}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
 
     # Read #
     def table_exists(self, table_name: str) -> bool:
