@@ -284,11 +284,16 @@ class MPPClient:
                 if regex.is_valid_url(query):
                     filename = command.opts["output"] if "output" in command.opts else query.split("/")[-1]
                     self.download_midi(query, filename=filename)
+                    downloaded_midis = self.db.get_midi_filenames()
                     values = {
                         "filename": filename,
                         "uploader_id": self.db.get_user_column(sender.client_id, "id")
                     }
-                    self.db.add_midi(values)
+                    if filename in downloaded_midis:
+                        values.update({"added_at": sqliteutils.datetime_to_string()})
+                        self.db.update_midi(filename, values)
+                    else:
+                        self.db.add_midi(values)
                     msgs.append(f"Successfully downloaded MIDI: `{filename}`")
                     # Add gaming task to simulation loop scheduler
                 else:

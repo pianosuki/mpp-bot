@@ -120,6 +120,13 @@ class DatabaseManager:
         self.connection.commit()
         self.logger.log(Debug.DATABASE, f"Updated user '{client_id}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
 
+    def update_midi(self, filename: str, column_values: dict):
+        command = f"UPDATE midis SET {', '.join([f'{column} = ?' for column in column_values])} WHERE filename = ?"
+        args = list(column_values.values()) + [filename]
+        self.cursor.execute(command, args)
+        self.connection.commit()
+        self.logger.log(Debug.DATABASE, f"Updated MIDI '{filename}': ({', '.join(['{}={}'.format(key, value) for key, value in column_values.items()])})")
+
     # Delete #
     def drop_table(self, table_name: str):
         command = f"DROP TABLE {table_name}"
