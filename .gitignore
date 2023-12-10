@@ -11,4 +11,4 @@
 instance/*
 
 # Config
-#/config/defaults.json
+/config/defaults.json
