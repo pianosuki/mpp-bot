@@ -1,8 +1,8 @@
-import asyncio, websockets, json, time
+import asyncio, websockets, json, time, requests, os
 from typing import List, Optional, Dict
 from src.crud import DatabaseManager
 from src.lib import MPPMessage, Logger, Participant, CommandMessage, Debug
-from src.utils import sqliteutils
+from src.utils import sqliteutils, regex
 from src.lib.exceptions import *
 from config import Config
 
@@ -261,17 +261,74 @@ class MPPClient:
 
     async def handle_echo_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         """ECHO"""
-        msg = f"{command.args['message']}"
+        response = []
+        msg = command.args['message']
         if command.opts["uppercase"]:
             msg = msg.upper()
         elif command.opts["lowercase"]:
             msg = msg.lower()
-        response = [MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg)]
+        response.append(MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg))
+        await self.outbound_queue.put(response)
+
+    async def handle_gaming_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
+        """GAMING"""
+        response = []
+        msgs = []
+        try:
+            if command.opts["list"]:
+                downloaded_midis = self.db.get_midi_filenames()
+                midi_list_string = ", ".join(['`{}`'.format(midi) for midi in downloaded_midis])
+                msgs.append(f"MIDIs: {midi_list_string}")
+            else:
+                query = command.args['midi']
+                if regex.is_valid_url(query):
+                    filename = command.opts["output"] if "output" in command.opts else query.split("/")[-1]
+                    self.download_midi(query, filename=filename)
+                    values = {
+                        "filename": filename,
+                        "uploader_id": self.db.get_user_column(sender.client_id, "id")
+                    }
+                    self.db.add_midi(values)
+                    msgs.append(f"Successfully downloaded MIDI: `{filename}`")
+                    # Add gaming task to simulation loop scheduler
+                else:
+                    results = self.search_midis(query)
+                    if results is not None:
+                        if len(results) > 1:
+                            found_midis_string = ", ".join(['`{}`'.format(midi) for midi in results])
+                            msgs.append(f"Multiple results found: {found_midis_string}")
+                            msgs.append(f"Please select one with `!gaming <file_name.mid>`")
+                        else:
+                            msgs.append(f"Result found: `{results[0]}`")
+                            # Add gaming task to simulation loop scheduler
+                    else:
+                        msgs.append("No results found. Do `!gaming -l` to browse downloaded MIDIs")
+            response.extend([MPPMessage(MPPMessage.ServerBound.MESSAGE, message=msg) for msg in msgs])
+        except HTTPError as e:
+            response.append(MPPMessage(MPPMessage.ServerBound.MESSAGE, message=e.error, reply_to=message.payload["id"]))
         await self.outbound_queue.put(response)
 
     async def handle_unknown_command(self, command: CommandMessage, message: MPPMessage, sender: Participant):
         """UNKNOWN"""
         pass
+
+    def download_midi(self, url: str, filename: str = None):
+        filename = url.split("/")[-1] if filename is None else filename
+        response = requests.get(url)
+        if response.status_code == 200:
+            destination_path = os.path.abspath("instance/midis/" + filename)
+            os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+            with open(destination_path, 'wb') as file:
+                file.write(response.content)
+            self.logger.log(Debug.FILESYSTEM, f"Downloaded new MIDI file: '{destination_path}'")
+        else:
+            self.logger.log(Debug.ERROR, f"Failed to download new MIDI file: '{filename}'")
+            raise HTTPError(url, response.status_code)
+
+    def search_midis(self, query: str) -> Optional[list[str]]:
+        searchable_files = self.db.get_midi_filenames()
+        results = regex.search_engine(query, searchable_files)
+        return [os.path.basename(result) for result in results] if results is not None else None
 
     @staticmethod
     def get_time():

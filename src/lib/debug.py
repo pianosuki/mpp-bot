@@ -8,6 +8,7 @@ class Debug(Enum):
     DATABASE = 2
     INBOUND = 4
     OUTBOUND = 8
+    FILESYSTEM = 16
 
     @staticmethod
     def from_string(debug: str) -> int:

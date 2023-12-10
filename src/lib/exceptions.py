@@ -1,6 +1,15 @@
 from typing import Any, Tuple, List, Optional
 
-__all__ = ["ArgumentValueError", "OptionValueError", "ArgumentMissingError", "OptionMissingError", "OptionMutualExclusivityError", "CommandAuthorizationError", "BotTermination"]
+__all__ = [
+    "ArgumentValueError",
+    "OptionValueError",
+    "ArgumentMissingError",
+    "OptionMissingError",
+    "OptionMutualExclusivityError",
+    "CommandAuthorizationError",
+    "BotTermination",
+    "HTTPError"
+]
 
 
 class ArgumentValueError(Exception):
@@ -54,4 +63,12 @@ class BotTermination(Exception):
     def __init__(self, cause: Exception = None):
         self.cause = cause
         self.error = f"Terminating bot. Cause: {cause}"
+        super().__init__(self.error)
+
+
+class HTTPError(Exception):
+    def __init__(self, url: str, status_code: int):
+        self.url = url
+        self.code = status_code
+        self.error = f"**Error:** [Status Code: `{self.code}`] - Failed to retrieve webpage: *{self.url}*"
         super().__init__(self.error)

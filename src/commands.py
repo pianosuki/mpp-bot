@@ -32,7 +32,7 @@ class Commands(Enum):
       - "name": <str>,
       - "type": <python_type_to_store_as>,
       - "character": <str>
-      - "mutually_exclusive_to": <list of other options' "name" values> (Ensures that this option cannot be used simultaneously with any of the specified options)
+      - "mutually_exclusive_to" [OPTIONAL]: <list of other options' "name" values> (Ensures that this option cannot be used simultaneously with any of the specified options)
 
     Example:
         ECHO = (
@@ -62,6 +62,16 @@ class Commands(Enum):
         [
             {"name": "uppercase", "type": bool, "character": "u", "mutually_exclusive_to": ["lowercase"]},
             {"name": "lowercase", "type": bool, "character": "l", "mutually_exclusive_to": ["uppercase"]}
+        ]
+    )
+
+    GAMING = (
+        "Rhythm gaming brought straight to your piano! Provide a link to or filename of a .mid and get rewarded with score based on your performance accuracy",
+        ["user"],
+        [{"name": "midi", "type": str, "required": False, "trailing": True}],
+        [
+            {"name": "list", "type": bool, "character": "l"},
+            {"name": "output", "type": str, "character": "o"}
         ]
     )
 

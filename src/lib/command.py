@@ -24,9 +24,10 @@ class CommandMessage:
         for opt in self.type.opts:
             if opt["name"] not in opts and opt["type"] is bool:
                 filtered[opt["name"]] = False
-            for conflicting_option in opt["mutually_exclusive_to"]:
-                if opt["name"] in opts and conflicting_option in opts:
-                    raise OptionMutualExclusivityError(opt["name"], conflicting_option)
+            if "mutually_exclusive_to" in opt:
+                for conflicting_option in opt["mutually_exclusive_to"]:
+                    if opt["name"] in opts and conflicting_option in opts:
+                        raise OptionMutualExclusivityError(opt["name"], conflicting_option)
         return filtered
 
     @classmethod

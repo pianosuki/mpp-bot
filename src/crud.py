@@ -48,7 +48,7 @@ class DatabaseManager:
     def create_table(self, table_name: str, column_def: str, foreign_key_def: str = None):
         command = f"CREATE TABLE IF NOT EXISTS {table_name} ({column_def})"
         if foreign_key_def is not None:
-            command += ", {}".format(foreign_key_def)
+            command = command.rstrip(")") + ", {})".format(foreign_key_def)
         self.cursor.execute(command)
         self.connection.commit()
 
@@ -63,6 +63,11 @@ class DatabaseManager:
         self.add_row("users", column_values)
         self.logger.log(Debug.DATABASE, f"Added user '{column_values['client_id']}': (name={column_values['usernames']}, roles={column_values['roles']})")
 
+    def add_midi(self, column_values: dict):
+        self.add_row("midis", column_values)
+        client_id = self.get_user_row_dict(column_values['uploader_id'])["client_id"]
+        self.logger.log(Debug.DATABASE, f"Added midi '{column_values['filename']}': (client_id={client_id})")
+
     # Read #
     def table_exists(self, table_name: str) -> bool:
         command = f"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?"
@@ -75,6 +80,13 @@ class DatabaseManager:
         args = [(client_id,)]
         self.cursor.execute(command, *args)
         return True if self.cursor.fetchone() is not None else False
+
+    def get_user_row_dict(self, row_id: int) -> Optional[dict]:
+        command = "SELECT * FROM users WHERE id = ?"
+        args = [(row_id,)]
+        self.cursor.execute(command, *args)
+        result = self.cursor.fetchone()
+        return self.row_to_dict("users", result) if result is not None else None
 
     def get_user_column(self, client_id: str, column_name: str) -> Optional[Any]:
         if self.user_exists(client_id):
@@ -94,6 +106,12 @@ class DatabaseManager:
         result = self.get_user_column(client_id, "roles")
         return [Role.from_name(role) for role in result.split(",")] if result is not None else None
 
+    def get_midi_filenames(self) -> list[str]:
+        command = "SELECT filename FROM midis"
+        self.cursor.execute(command)
+        result = self.cursor.fetchall()
+        return [row[0] for row in result]
+
     # Update #
     def update_user(self, client_id: str, column_values: dict):
         command = f"UPDATE users SET {', '.join([f'{column} = ?' for column in column_values])} WHERE client_id = ?"
@@ -107,3 +125,16 @@ class DatabaseManager:
         command = f"DROP TABLE {table_name}"
         self.cursor.execute(command)
         self.connection.commit()
+
+    # Misc #
+    def row_to_dict(self, table: str, row: tuple) -> dict:
+        row_dict = {}
+        for index, column in enumerate(self.schema_get_table(table)["columns"]):
+            row_dict[column["column_name"]] = row[index]
+        return row_dict
+
+    def schema_get_table(self, table_name: str) -> Optional[dict]:
+        for table in self.schema["tables"]:
+            if table["name"] == table_name:
+                return table
+        return None
