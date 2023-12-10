@@ -10,6 +10,19 @@
                 {"column_name": "added_at", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]},
                 {"column_name": "last_seen", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]}
             ]
+        },
+        {
+            "name": "midis",
+            "columns": [
+                {"column_name": "id", "column_type": "INTEGER", "primary_key": true},
+                {"column_name": "filename", "column_type": "TEXT", "unique": true, "nullability": false},
+                {"column_name": "uploader_id", "column_type": "INTEGER"},
+                {"column_name": "added_at", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]},
+                {"column_name": "last_played", "column_type": "TEXT", "default_function": ["sqliteutils.datetime_to_string", null]}
+            ],
+            "foreign_keys": [
+                {"child_key": "uploader_id", "parent_table": "users", "parent_key": "id"}
+            ]
         }
     ],
     "defaults": {
